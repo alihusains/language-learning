@@ -1,110 +1,107 @@
-import os
 import requests
 import pandas as pd
 import sqlite3
+import os
 from datetime import datetime, timedelta
 
-# Setup output directory
-os.makedirs("output", exist_ok=True)
+# Set output directory
+output_dir = "output"
+os.makedirs(output_dir, exist_ok=True)
 
-# Environment Config
-languages = os.getenv("LANGUAGES").split(",")
-base_date = datetime(2013, 9, 2)
-today = datetime.now()
+# List of languages
+languages = os.getenv("LANGUAGES").split(',')
 
-def fetch_word_of_the_day(language, date):
-    url = f'https://{language.lower()}pod101.com/api/word-day/{date}'
-    headers = {
-        'accept': '*/*',
-        'accept-language': 'en',
-        'user-agent': 'Mozilla/5.0',
-        'x-requested-with': 'XMLHttpRequest'
-    }
-    response = requests.get(url, headers=headers)
-    return response.json() if response.status_code == 200 else None
+# Base URL template
+base_url_template = "https://{language}pod101.com/api/word-day/{date}"
 
-def save_to_csv(data, examples, language):
-    # Save word data
-    word_df = pd.DataFrame(data)
-    word_df.to_csv(f"output/{language.lower()}.csv", index=False)
+# Function to fetch data for a given language and date
+def fetch_data(language, date):
+    url = base_url_template.format(language=language, date=date)
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        print(f"Failed to fetch data for {language} on {date}")
+        return None
 
-    # Save examples data
-    example_df = pd.DataFrame(examples)
-    example_df.to_csv(f"output/{language.lower()}-examples.csv", index=False)
-
-def save_to_sqlite(data, examples, language):
-    db_path = f"output/{language.lower()}.sqlite"
-    conn = sqlite3.connect(db_path)
-
-    # Save words
-    word_df = pd.DataFrame(data)
-    word_df.to_sql("words", conn, if_exists="replace", index=False)
-
-    # Save examples
-    example_df = pd.DataFrame(examples)
-    example_df.to_sql("examples", conn, if_exists="replace", index=False)
-
-    conn.close()
-
+# Main function
 def main():
-    all_words = []
-    all_examples = []
-
+    current_date = datetime.today()
+    start_date = datetime(2013, 9, 2)
+    
+    # Loop through languages
     for language in languages:
         word_data = []
-        example_data = []
-        date = base_date
-
-        while date <= today:
-            date_str = date.strftime('%Y-%m-%d')
-            response = fetch_word_of_the_day(language, date_str)
-
-            if response and response['status'] == 'success':
-                word_day = response['payload']['word_day']
-                word_data.append({
-                    "Date": date_str,
-                    "Dictionary ID": word_day['dictionary_id'],
-                    "Flashcard ID": word_day['flashcard_id'],
-                    "Word": word_day['text'],
-                    "English": word_day['english'],
-                    "Meaning": word_day['meaning'],
-                    "Class": word_day['class'],
-                    "Gender": word_day['gender'],
-                    "Romanization": word_day['romanization'],
-                    "Vowelled": word_day['vowelled'],
-                    "Audio Target": word_day['audio_target'],
-                    "Audio English": word_day['audio_english'],
-                    "Image URL": word_day['image_url']
-                })
-
-                # Add examples
-                for sample in word_day.get('samples', []):
-                    example_data.append({
-                        "Date": date_str,
-                        "Dictionary ID": word_day['dictionary_id'],
-                        "Example Text": sample['text'],
-                        "Example English": sample['english'],
-                        "Example Romanization": sample['romanization'],
-                        "Example Vowelled": sample['vowelled'],
-                        "Audio Target": sample['audio_target'],
-                        "Audio English": sample['audio_english']
-                    })
-
+        examples_data = []
+        
+        # Loop through dates from start_date to current_date
+        date = start_date
+        while date <= current_date:
+            formatted_date = date.strftime("%Y-%m-%d")
+            data = fetch_data(language, formatted_date)
+            
+            if data and data.get("status") == "success":
+                word_day = data["payload"]["word_day"]
+                
+                # Append word of the day data with missing field handling
+                word_entry = {
+                    "Date": formatted_date,
+                    "Dictionary ID": word_day.get("dictionary_id", ""),
+                    "Flashcard ID": word_day.get("flashcard_id", ""),
+                    "Text": word_day.get("text", ""),
+                    "Audio Target": word_day.get("audio_target", ""),
+                    "Audio English": word_day.get("audio_english", ""),
+                    "Image URL": word_day.get("image_url", ""),
+                    "English": word_day.get("english", ""),
+                    "Meaning": word_day.get("meaning", ""),
+                    "Class": word_day.get("class", ""),
+                    "Gender": word_day.get("gender", ""),  # Default to empty string if missing
+                    "Romanization": word_day.get("romanization", ""),
+                    "Vowelled": word_day.get("vowelled", "")
+                }
+                word_data.append(word_entry)
+                
+                # Append examples with missing field handling
+                for example in word_day.get("samples", []):
+                    example_entry = {
+                        "Date": formatted_date,
+                        "Dictionary ID": word_day.get("dictionary_id", ""),
+                        "Text": example.get("text", ""),
+                        "Audio Target": example.get("audio_target", ""),
+                        "Audio English": example.get("audio_english", ""),
+                        "English": example.get("english", ""),
+                        "Romanization": example.get("romanization", ""),
+                        "Vowelled": example.get("vowelled", "")
+                    }
+                    examples_data.append(example_entry)
+                    
             date += timedelta(days=1)
+        
+        # Save to CSV
+        word_df = pd.DataFrame(word_data)
+        examples_df = pd.DataFrame(examples_data)
+        
+        word_csv_path = os.path.join(output_dir, f"{language.lower()}.csv")
+        examples_csv_path = os.path.join(output_dir, f"{language.lower()}-examples.csv")
+        word_df.to_csv(word_csv_path, index=False)
+        examples_df.to_csv(examples_csv_path, index=False)
+        
+        # Save to SQLite
+        sqlite_path = os.path.join(output_dir, f"{language.lower()}.sqlite")
+        with sqlite3.connect(sqlite_path) as conn:
+            word_df.to_sql(f"{language.lower()}", conn, if_exists="replace", index=False)
+            examples_df.to_sql(f"{language.lower()}_examples", conn, if_exists="replace", index=False)
 
-        # Save to CSV and SQLite for the current language
-        save_to_csv(word_data, example_data, language)
-        save_to_sqlite(word_data, example_data, language)
-
-        # Append to combined data
-        all_words.extend(word_data)
-        all_examples.extend(example_data)
-
-    # Save combined data to a single SQLite
-    conn = sqlite3.connect("output/all_languages.sqlite")
-    pd.DataFrame(all_words).to_sql("words", conn, if_exists="replace", index=False)
-    pd.DataFrame(all_examples).to_sql("examples", conn, if_exists="replace", index=False)
-    conn.close()
+    # Combine all languages into one SQLite file
+    combined_sqlite_path = os.path.join(output_dir, "all_languages.sqlite")
+    with sqlite3.connect(combined_sqlite_path) as combined_conn:
+        for language in languages:
+            language_name = language.lower()
+            word_df = pd.read_csv(os.path.join(output_dir, f"{language_name}.csv"))
+            examples_df = pd.read_csv(os.path.join(output_dir, f"{language_name}-examples.csv"))
+            
+            word_df.to_sql(f"{language_name}", combined_conn, if_exists="replace", index=False)
+            examples_df.to_sql(f"{language_name}_examples", combined_conn, if_exists="replace", index=False)
 
 if __name__ == "__main__":
     main()
