@@ -19,7 +19,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install requests pandas sqlite3
+          pip install requests pandas
 
       - name: Run Fetch Script
         env:
