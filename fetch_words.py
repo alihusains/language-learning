@@ -27,7 +27,7 @@ def fetch_data(language, date):
 # Main function
 def main():
     current_date = datetime.today()
-    start_date = datetime(2011, 1, 1)
+    start_date = datetime(2013, 9, 2)
     
     # Loop through languages
     for language in languages:
@@ -70,7 +70,7 @@ def main():
                         "Audio Target": example.get("audio_target", ""),
                         "Audio English": example.get("audio_english", ""),
                         "English": example.get("english", ""),
-                        "Romanization": example.get("romanization", ""),
+                        "Romanization": example.get("romanization", ""),  # Set a default value
                         "Vowelled": example.get("vowelled", "")
                     }
                     examples_data.append(example_entry)
