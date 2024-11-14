@@ -27,7 +27,7 @@ def fetch_data(language, date):
 # Main function
 def main():
     current_date = datetime.today()
-    start_date = datetime(2013, 9, 2)
+    start_date = datetime(2011, 1, 1)
     
     # Loop through languages
     for language in languages:
