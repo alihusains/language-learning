@@ -1,0 +1,34 @@
+name: Fetch Word of the Day
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Runs daily at midnight UTC
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  fetch_words:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install Dependencies
+        run: |
+          pip install requests pandas sqlite3
+
+      - name: Run Fetch Script
+        env:
+          LANGUAGES: "Afrikaans,Bulgarian,Cantonese,Chinese,Czech,Danish,Dutch,English,Filipino,Finnish,French,German,Greek,Hebrew,Hindi,Hungarian,Indonesian,Italian,Japanese,Korean,Norwegian,Persian,Polish,Portuguese,Romanian,Russian,Spanish,Swahili,Swedish,Thai,Turkish,Urdu,Vietnamese"
+        run: |
+          python fetch_words.py
+          
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: word_of_the_day_data
+          path: output/
